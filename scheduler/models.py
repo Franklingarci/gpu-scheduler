@@ -40,21 +40,8 @@ class Job:
         return self.completion_time - self.start_time
 
 
-@dataclass
-class GPUDevice:
-    id: int
-    total_memory_mb: int
-    used_memory_mb: int = 0
-    running_jobs: list[int] = field(default_factory=list)
-
-    @property
-    def free_memory_mb(self) -> int:
-        return self.total_memory_mb - self.used_memory_mb
-
-    @property
-    def utilization_pct(self) -> float:
-        """Memory-based utilization as a proxy — real deployment reads
-        compute utilization from NVML too (see gpu_monitor.py)."""
-        if self.total_memory_mb == 0:
-            return 0.0
-        return 100.0 * self.used_memory_mb / self.total_memory_mb
+# GPUDevice used to live here. It carried both hardware facts
+# (total/used memory) and scheduler bookkeeping (running_jobs), which is the
+# conflation that made NVML impossible to swap in. It is now two types:
+# gpu.DeviceState for what the hardware reports, pool.Slot for the
+# reconciled view a policy decides against.
