@@ -7,9 +7,10 @@ Nine strategies, thirty seeds, paired confidence intervals. The core has zero
 third-party dependencies and needs no GPU to run.
 
 ```bash
-python simulate.py    # one trace through all nine policies
-python bench.py       # 30-seed sweep with confidence intervals
-python -m pytest      # 141 tests, 0.15s
+python simulate.py                              # one trace, all nine policies
+python bench.py                                 # 30-seed sweep with CIs
+python run.py --jobs examples/jobs.json --dry-run   # run real processes
+python -m pytest                                # 163 tests, ~1.8s
 ```
 
 ## Results
@@ -212,11 +213,68 @@ there is no contention, every policy places everything immediately, and all
 nine tie. A benchmark that cannot create contention measures nothing, which
 is what happened when the original was run with 8 GPUs.
 
+## Running real jobs
+
+`run.py` drives real processes on a real pool using the same nine policies.
+Jobs come from a JSON file:
+
+```json
+[
+  {"name": "train-a", "memory_mb": 8000, "priority": 2,
+   "command": ["python", "train.py", "--lr", "3e-4"]}
+]
+```
+
+```bash
+python run.py --jobs examples/jobs.json --policy priority+best_fit
+```
+
+Each job is launched with `CUDA_VISIBLE_DEVICES` set to the card the
+scheduler picked, so it sees exactly one GPU, numbered 0.
+
+**`--dry-run` swaps NVML for a simulated pool while still launching real
+processes.** Scheduling, pinning, reaping, exit codes and rollback are all
+exercised; only the GPU readings are fake. Rehearse a job file this way
+before spending money on hardware:
+
+```
+$ python run.py --jobs examples/jobs.json --dry-run --gpus 2
+[start ] train-large          gpu0  12000MB
+[start ] sweep-shard-1        gpu1  6000MB
+[start ] sweep-shard-2        gpu1  6000MB
+[start ] eval-a               gpu0  3000MB
+[done  ] eval-a               gpu0     2.0s  ok
+[start ] preprocess           gpu0  2000MB
+[done  ] train-large          gpu0     4.1s  ok
+
+6/6 finished in 4.1s
+```
+
+Three things exist here that have no counterpart in simulation, each one a
+way real hardware misbehaves:
+
+- **A job finishes when its process exits**, not when an estimate elapses. It
+  can crash in two seconds or hang past any prediction. The core is told; it
+  never infers. Non-zero exits are recorded separately from completions,
+  because a fleet where everything crashes has excellent makespan and has
+  accomplished nothing.
+- **A launch can fail outright** on a bad binary or a missing file. The
+  reservation is already on the books by then, so it is rolled back. Without
+  that, the memory is gone for the rest of the run and every later job is
+  scheduled against a pool that is quietly smaller.
+- **The run can stall.** If arrived work is queued, nothing is running, and
+  nothing fits, `StalledError` is raised rather than polling forever. That
+  guard exists because mutation testing removed the rollback above and the
+  test suite *hung* instead of failing, which is the worse outcome.
+
+Interrupting with Ctrl-C terminates running children rather than orphaning
+processes that still hold GPU memory.
+
 ## Testing
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest              # 141 tests, ~0.15s, no GPU required
+python -m pytest              # 163 tests, ~1.8s, no GPU required
 ```
 
 Policy tests need no clock, no hardware and no scheduler, which is the payoff
@@ -224,9 +282,11 @@ of keeping policies pure. `test_nvml.py` exercises the real-hardware path
 against a stub driver, pinning unit conversion and device-index mapping
 before any GPU time gets spent on them.
 
-The suite is verified by mutation rather than assumed: reintroducing the
+The suite is verified by mutation rather than assumed. Reintroducing the
 original `continue`-instead-of-`break` fails 2 tests including the one named
-for it, and removing the per-pass memory budget fails 17.
+for it; removing the per-pass memory budget fails 17. Mutating the live
+driver's launch rollback made the suite hang rather than fail, which is how
+`StalledError` came to exist.
 
 A pre-commit hook runs the suite against the staged snapshot, not the working
 tree, so staging a subset is validated as what it actually is. Enable it on a
@@ -253,15 +313,17 @@ ctypes wrapper that only fails at `nvmlInit()`.
 
 ## Status
 
-Working: simulator, nine policies, paired benchmark harness, test suite.
+Working: simulator, nine policies, paired benchmark harness, live driver,
+JSONL run logging, test suite.
+
+The live driver required no changes to `policy.py` or `core.py`, which was
+the entire point of the sensor/ledger split and is now demonstrated rather
+than claimed. A test runs all nine policies against real processes.
 
 Not yet built:
 
-- **Live driver.** Wall clock, NVML, `subprocess` pinned with
-  `CUDA_VISIBLE_DEVICES`. The policies and core need no changes for it, which
-  is the entire point of the sensor/ledger split.
 - **Real-hardware validation.** The open question is whether packing
   strategies separate once compute contention is real. This simulator cannot
-  answer it.
+  answer it, and `--dry-run` cannot either.
 - **Runtime estimates for backfill**, to test whether proper EASY backfill
   beats the conservative reservation this version uses.

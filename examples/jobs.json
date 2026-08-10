@@ -1,0 +1,39 @@
+[
+  {
+    "name": "train-large",
+    "memory_mb": 12000,
+    "priority": 3,
+    "command": ["python3", "-c", "import time; print('training'); time.sleep(4)"]
+  },
+  {
+    "name": "eval-a",
+    "memory_mb": 3000,
+    "priority": 1,
+    "command": ["python3", "-c", "import time; print('eval a'); time.sleep(2)"]
+  },
+  {
+    "name": "eval-b",
+    "memory_mb": 3000,
+    "priority": 1,
+    "command": ["python3", "-c", "import time; print('eval b'); time.sleep(2)"]
+  },
+  {
+    "name": "preprocess",
+    "memory_mb": 2000,
+    "priority": 0,
+    "arrival_time": 1.0,
+    "command": ["python3", "-c", "import time; print('preprocessing'); time.sleep(1)"]
+  },
+  {
+    "name": "sweep-shard-1",
+    "memory_mb": 6000,
+    "priority": 2,
+    "command": ["python3", "-c", "import time; print('shard 1'); time.sleep(3)"]
+  },
+  {
+    "name": "sweep-shard-2",
+    "memory_mb": 6000,
+    "priority": 2,
+    "command": ["python3", "-c", "import time; print('shard 2'); time.sleep(3)"]
+  }
+]

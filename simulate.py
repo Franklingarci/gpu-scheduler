@@ -24,9 +24,11 @@ What does vary: how fast the queue drains (makespan), how long jobs wait
 (early-window utilization).
 """
 import argparse
+from contextlib import nullcontext
 
 from scheduler import policy as policies
 from scheduler.job_generator import generate_jobs, load_factor
+from scheduler.logger import RunLogger
 from scheduler.simulation import simulate
 
 
@@ -38,6 +40,12 @@ def main() -> None:
     ap.add_argument("--gpu-mb", type=int, default=16000)
     ap.add_argument("--arrival-span", type=float, default=60.0)
     ap.add_argument("--aging", type=float, default=0.0)
+    ap.add_argument(
+        "--log-dir",
+        help="write one JSONL per policy here: the utilization time series and "
+             "every finished job. Off by default, since the summary table below "
+             "is what a single run is usually for.",
+    )
     args = ap.parse_args()
 
     jobs = generate_jobs(
@@ -57,15 +65,22 @@ def main() -> None:
             trace = generate_jobs(
                 count=args.jobs, seed=args.seed, arrival_span_s=args.arrival_span
             )
-            results.append(
-                simulate(
-                    pol,
-                    trace,
-                    gpu_count=args.gpus,
-                    memory_per_gpu_mb=args.gpu_mb,
-                    seed=args.seed,
-                )
+            log = (
+                RunLogger(f"{args.log_dir}/{pol.name}.jsonl", policy=pol.name, seed=args.seed)
+                if args.log_dir
+                else nullcontext(None)
             )
+            with log as logger:
+                results.append(
+                    simulate(
+                        pol,
+                        trace,
+                        gpu_count=args.gpus,
+                        memory_per_gpu_mb=args.gpu_mb,
+                        seed=args.seed,
+                        logger=logger,
+                    )
+                )
 
     window = max(r.makespan for r in results)
     early = args.arrival_span  # while work is still arriving

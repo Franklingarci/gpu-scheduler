@@ -15,7 +15,6 @@ Records carry the run's identity - policy name and seed - on every line, so
 files from a multi-seed sweep can be concatenated and still be separable.
 """
 import json
-from contextlib import contextmanager
 from pathlib import Path
 
 from .models import Job
@@ -71,18 +70,14 @@ class RunLogger:
         self.close()
 
 
-@contextmanager
-def null_logger():
-    """A logger that discards everything.
-
-    The multi-seed sweep runs hundreds of simulations and only needs the
-    summary numbers; writing a JSONL file per run would produce tens of
-    thousands of files nobody reads.
-    """
-    yield _NullLogger()
-
-
 class _NullLogger:
+    """Discards everything.
+
+    The default, because the sweep runs hundreds of simulations and only wants
+    the summary numbers - writing a JSONL per run would produce thousands of
+    files nobody reads. Recording is opt-in via `simulate.py --log-dir`.
+    """
+
     policy = ""
     seed = None
 
