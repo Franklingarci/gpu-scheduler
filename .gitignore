@@ -4,3 +4,4 @@ __pycache__/
 venv/
 plots/*.png
 .DS_Store
+.pytest_cache/

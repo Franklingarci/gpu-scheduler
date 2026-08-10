@@ -1,1 +1,7 @@
-pynvml
+# The core project has no third-party dependencies, on purpose.
+#   python simulate.py
+# works on a clean checkout with nothing installed and no GPU.
+#
+# Optional extras:
+#   pynvml   real-hardware monitoring (scheduler/gpu.py NVMLGPUMonitor)
+#   pytest   the test suite, see requirements-dev.txt

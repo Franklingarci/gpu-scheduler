@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Fail on an unraised warning rather than letting deprecations accumulate
+# silently until a Python upgrade breaks the suite all at once.
+filterwarnings = ["error"]
