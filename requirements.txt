@@ -1,7 +1,11 @@
-# The core project has no third-party dependencies, on purpose.
-#   python simulate.py
-# works on a clean checkout with nothing installed and no GPU.
+# Real-hardware GPU monitoring (scheduler/gpu.py :: NVMLGPUMonitor).
 #
-# Optional extras:
-#   pynvml   real-hardware monitoring (scheduler/gpu.py NVMLGPUMonitor)
-#   pytest   the test suite, see requirements-dev.txt
+# nvidia-ml-py is NVIDIA's own package and provides the `pynvml` module.
+# Do not swap this for the `pynvml` distribution on PyPI: that one is
+# deprecated, emits a FutureWarning on import, and just pulls in this
+# package anyway.
+#
+# Installs cleanly on a machine with no NVIDIA driver - it is a ctypes
+# wrapper, so it only fails at nvmlInit() when there is no libnvidia-ml to
+# find. That means the simulator still runs anywhere.
+nvidia-ml-py>=12.0
