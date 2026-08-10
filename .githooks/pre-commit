@@ -1,0 +1,31 @@
+#!/bin/sh
+# Block a commit whose staged snapshot fails the test suite.
+#
+# Tests run against a throwaway checkout of the INDEX, not the working tree.
+# That distinction is the whole point: `git add scheduler/` then committing
+# would otherwise be validated against unstaged edits that are not going into
+# the commit, which is precisely how 8b33d14 shipped with a broken import.
+#
+# No stashing, so an interrupted hook can never lose working-tree changes.
+#
+# Bypass deliberately with:  git commit --no-verify
+
+set -e
+
+if ! python3 -c "import pytest" 2>/dev/null; then
+    echo "pre-commit: pytest not installed, skipping tests"
+    echo "            pip install -r requirements-dev.txt"
+    exit 0
+fi
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+git checkout-index -a -f --prefix="$tmp/"
+
+if ! (cd "$tmp" && python3 -m pytest -q); then
+    echo
+    echo "pre-commit: staged changes fail the suite; commit blocked."
+    echo "            fix them, or bypass with: git commit --no-verify"
+    exit 1
+fi
